@@ -102,6 +102,16 @@ VERSION 1.1.2
 
 Disconnect an established connection.
 
+#### Meta protocol (minimal)
+
+Meta protocol supports `mg` with `v` flag only.
+
+```
+mg key v
+VA 19
+1234567890123456789
+```
+
 ## Protocol (HTTP)
 
 katsubushi also runs an HTTP server specified with `-http-port`.

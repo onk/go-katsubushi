@@ -207,6 +207,64 @@ func TestAppError(t *testing.T) {
 	}
 }
 
+func TestAppMetaGet(t *testing.T) {
+	ctx := context.Background()
+	app := newTestAppAndListenTCP(ctx, t, nil)
+	client, err := newTestClient(app.Listener.Addr().String())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer client.conn.Close()
+
+	resp, err := client.Command("mg hoge v")
+	if err != nil {
+		t.Fatal(err)
+	}
+	res := strings.TrimSuffix(string(resp), "\r\n")
+	lines := strings.Split(res, "\r\n")
+	if len(lines) != 2 {
+		t.Fatalf("unexpected mg response lines: %q", res)
+	}
+	header := strings.Fields(lines[0])
+	if len(header) != 2 || header[0] != "VA" {
+		t.Fatalf("unexpected mg header: %q", lines[0])
+	}
+	valLen, err := strconv.Atoi(header[1])
+	if err != nil {
+		t.Fatalf("invalid mg length: %q", header[1])
+	}
+	if len(lines[1]) != valLen {
+		t.Fatalf("unexpected mg value length: got %d want %d", len(lines[1]), valLen)
+	}
+	if _, err := strconv.ParseInt(lines[1], 10, 64); err != nil {
+		t.Fatalf("invalid mg value: %q", lines[1])
+	}
+}
+
+func TestAppMetaGetError(t *testing.T) {
+	ctx := context.Background()
+	app := newTestAppAndListenTCP(ctx, t, nil)
+	client, err := newTestClient(app.Listener.Addr().String())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer client.conn.Close()
+
+	cases := []string{
+		"mg hoge",
+		"mg hoge f",
+	}
+	for _, c := range cases {
+		resp, err := client.Command(c)
+		if err != nil {
+			t.Fatalf("command failed: %s", c)
+		}
+		if string(resp) != "ERROR\r\n" {
+			t.Fatalf("unexpected response for %q: %q", c, resp)
+		}
+	}
+}
+
 func TestAppIdleTimeout(t *testing.T) {
 	ctx := context.Background()
 	to := time.Second

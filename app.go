@@ -444,6 +444,21 @@ func (app *App) BytesToCmd(data []byte) (cmd MemdCmd, err error) {
 			Name: name,
 			Keys: fields[1:],
 		}
+	case "MG":
+		atomic.AddInt64(&(app.cmdGet), 1)
+		if len(fields) < 3 {
+			err = fmt.Errorf("MG command needs key and v flag")
+			return
+		}
+		for _, flag := range fields[2:] {
+			if flag != "v" {
+				err = fmt.Errorf("MG supports only v flag")
+				return
+			}
+		}
+		cmd = &MemdCmdMetaGet{
+			Key: fields[1],
+		}
 	case "QUIT":
 		cmd = MemdCmdQuit(0)
 	case "STATS":
@@ -467,6 +482,32 @@ func (app *App) extendDeadline(conn net.Conn) (time.Time, error) {
 // MemdCmd defines a command.
 type MemdCmd interface {
 	Execute(*App, io.Writer) error
+}
+
+// MemdCmdMetaGet defines Meta Get command (minimal: v flag only).
+type MemdCmdMetaGet struct {
+	Key string
+}
+
+// Execute generates new ID and responds to meta get.
+func (cmd *MemdCmdMetaGet) Execute(app *App, conn io.Writer) error {
+	id, err := app.NextID()
+	if err != nil {
+		slog.Warn("Failed to generate ID", "error", err)
+		if err = app.writeError(conn); err != nil {
+			slog.Warn("error on write error", "error", err)
+			return err
+		}
+		return nil
+	}
+	slog.Debug("Generated ID", "id", id)
+	value := strconv.FormatUint(id, 10)
+	io.WriteString(conn, "VA ")
+	io.WriteString(conn, strconv.Itoa(len(value)))
+	conn.Write(memdSep)
+	io.WriteString(conn, value)
+	_, err = conn.Write(memdSep)
+	return err
 }
 
 // MemdCmdGet defines Get command.
